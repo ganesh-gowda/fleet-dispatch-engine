@@ -127,6 +127,26 @@ npm run build
 
 GitHub Actions runs the backend test/package pipeline and the dashboard typecheck/build pipeline on pushes and pull requests to `main`.
 
+## Performance & benchmarking
+
+A **30.39× improvement** was recorded during local optimization of driver candidate discovery. This is a local benchmark result, not a production latency or throughput guarantee; results depend on the machine, JVM, and workload. The repository contains benchmark harnesses to inspect and reproduce the relevant comparisons.
+
+| Benchmark | What it measures | Workload / configuration |
+|---|---|---|
+| Driver candidate discovery ([source](backend/src/main/java/com/ganesh/fleetdispatch/benchmark/DriverCandidateDiscoveryBenchmark.java)) | Full scan vs. grid-backed lookup; reports median and p95 and checks that both approaches return the same candidate IDs | 10,000 and 100,000 drivers; fixed seed; 1 km radius; top 20 candidates; 10 warm-up and 30 measured iterations |
+| Concurrent candidate discovery ([JMH source](backend/src/main/java/com/ganesh/fleetdispatch/benchmark/DriverCandidateDiscoveryJmhBenchmarkFixed.java)) | Full scan vs. grid lookup, read-only concurrency, location updates, and mixed lookup/update activity | 10,000 and 100,000 drivers; JMH sample-time mode; 3 × 1 s warm-up, 5 × 1 s measurement, 2 forks; mixed group uses 7 lookup threads and 1 update thread |
+| Spatial index comparison ([JMH source](backend/src/main/java/com/ganesh/fleetdispatch/benchmark/SpatialIndexComparisonJmhBenchmark.java)) | Grid vs. H3 nearby-driver lookup | 10,000 and 100,000 drivers; 2 km radius; top 20 candidates; JMH sample-time mode |
+| Batch dispatch ([JMH source](backend/src/main/java/com/ganesh/fleetdispatch/benchmark/BatchDispatchJmhBenchmark.java)) | Repeated greedy dispatch vs. global minimum-cost batch assignment | Batch sizes of 10, 50, and 100; synthetic routing fixture |
+| Nearest-node lookup ([source](backend/src/main/java/com/ganesh/fleetdispatch/graph/NodeLocatorComparisonBenchmark.java)) | Brute-force lookup vs. KD-tree lookup; reports index build time and lookup average, p50, p95, and p99 | Real road graph supplied as `nodes.csv` and `edges.csv`; 10 fixed geographic queries |
+
+Run the deterministic driver-discovery comparison from the repository root:
+
+```powershell
+mvn -B -DskipTests compile exec:java -Dexec.mainClass=com.ganesh.fleetdispatch.benchmark.DriverCandidateDiscoveryBenchmark
+```
+
+The JMH harnesses are available in the backend benchmark package. The repository does not currently publish a production load-test result for end-to-end assignment throughput or API p95 latency; those should be measured separately rather than inferred from microbenchmarks.
+
 ## API and operations endpoints
 
 Useful endpoints include:
